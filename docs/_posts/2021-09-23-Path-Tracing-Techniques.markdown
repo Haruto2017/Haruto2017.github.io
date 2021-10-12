@@ -10,7 +10,7 @@ RayTracing is used in computer rendering to make multi-bounce lighting aka. glob
 
 Implementing a RayTracing renderer needs us to address a lot of problems and details. To start, we definitely need to find out which small piece of surface each beam of light comes across in our scene.
 
-# Intersection Problem
+## Intersection Problem
 
 We might start to think of the need to represent shapes of things in a mathematic way. Beams of light are easy ones. They are simply lines. But before writting out their functions, we must decide what space we are using. For 3D space RayTracing, we can just use 3D Euclidean space (just xyz axis perpendicular to each other). There are usually two basic mathematic representation of shapes in the Euclidean space: one is the implicit form and the other is the parametric form. 
 
@@ -24,15 +24,71 @@ For lines, you can take a look at [this website][equation-of-lines] where there 
 
 Let's explain how the parametric form works for lines with the slide below from [Games101][Game101-Class]. This form works in any dimension (we can think of them in 3d space here).
 
-![some-image](/images/Ray.png)
+![ray-equation](/images/Ray.png)
 
 In the slide, "o" is the origin from which the line (or light ray) starts, and "d" is the unit vector describing the direction that the line is following through. They are all constant values. "t" here is the parameter that changes to describe how far we are travelling in the direction "d". It is worth noting here that "t" can be negative, meaning the line is travelling backwards. "r(t)" is the 3d vector that describes the point that the line is reaching at.
 
-In this form, we can solve for t by replacing any (x, y, z) with r(t) and get an equation with only one unknown variable whcih is easy to solve. For example, we can replace any input into the implicit form that we have described earlier with "o + td" and get f(o + td) = 0.
+In this form, we can solve for t by replacing any (x, y, z) with r(t) and get an equation with only one unknown variable which is fairly easy to solve. For example, we can replace any input into the implicit form that we have described earlier with "o + td" and get f(o + td) = 0.
 
+Let's look at an example of the intersection between ray and sphere.
 
+![ray-intersect-sphere](/images/RaySphere.png)
 
+In the slide, we can see the implicit form of a sphere. In the equation, "c" is the 3d coordinate of the center of the sphere and "R" is the radius of the sphere in the form of (r, r, r). By replacing "p" which describes any point on the sphere with "o + td", we can solve for the intersection between the line and the sphere. However, the result equation is a quadratic equation so that it can have 0, 1, or 2 intersection points. Let's look at the next slide.
 
+![ray-solution](/images/SphereSolution.png)
+
+There are three cases by solving the "b^2 - 4ac".
+
+1. "b^2 - 4ac" > 0 : 2 intersection points
+2. "b^2 - 4ac" = 0 : 1 intersection points
+3. "b^2 - 4ac" < 0 : 0 intersection points
+
+If we calculate the bounding spheres of all objects in our scene, we have a simple solution to find out if any light ray intersects with an object in the scene. However, we also need further know which small triangle that the light ray intersects with on that object since that's what we care about when rendering pixels. 
+
+The simplest idea is to traverse all triangles and test if the light ray intersects with that triangle. And the one of the easiest way to optimize this is to check for the intersection point between the light ray and the plane that the triangle is on first. Then we can further check if the point is within the triangle. 
+
+The equation of plane is shown in the slide. The basic idea is taking a point on the plane with a normal vector. We can then take any point and get the vector between the arbitrary point and the point on plane. Finally we can use the fact that the dot product of two perpendicular vectors is zero to check if the arbitrary point is on the plane.
+
+![plane-equation](/images/Plane.png)
+
+Then we can solve for the intersection point between the plane and the light ray.
+
+![plane-ray](/images/RayPlane.png)
+
+The idea is the same as the problem of sphere-ray intersection as we are substituting the input into the function with our ray function "o + td". There also exists a faster approach to the problem which is called the Moller Trumbore Algorithm and you can find it [here][Moller]. This algorithm directly gives the barycentric coordinate of the intersection point. We can then apply the two rules of the barycentric coordinate of triangles to determine if the point is inside the triangle: all non-zero and add up to one.
+
+After solving the problem of finding the intersection point between light and object, we can easily realize one thing which is the low efficiency of checking each light rays with all objects in the scene. So we need to find a way to accelerate this process. 
+
+## Acceleration of Finding Intersection
+
+We first introduce the concept of AABB (Axis Aligned Bounding Box). It is basically a box which has all its sides parallel to one of the xyz axis. To represent such a box, we can use six values to give the box's min & max value in the 3 axis. To find the AABB of any objects is easy, traverse all its vertices and keep the record of the max & min values in the x, y, z directions. 
+
+![AABB](/images/AABB.png)
+
+Then we can look at how to check if the light intersects with the AABB. 
+
+![AABBCheck](/images/AABBEnter.png)
+
+We can calculate two numbers very easily with the ray function "o + td". They are the times that the ray enters and leaves the two slabs in one direction. We just use the "o" and "d" in one direction and calculate the "t" for the max and min values of the AABB in that direction. However, we must know for the entire AABB if the ray has entered it.
+
+![AABBCheck2](/images/AABBCheck.png)
+
+The main idea is: The last time that the ray enters a pair of slab must be earlier that the first time that it leaves a pair of slab. There are three pairs of slabs in total.
+
+Then we need to use AABB to find some data structure to store the scene and accelerate the intersection problem. In the world of computer science, binary tree is commonly used to accelerate the searching algorithm and a balanced binary tree can have a searching time of only O(logn). While binary tree is on 1D scale, we need higher dimension of data structure in 2D and 3D space. The most basic ones are quad tree for 2D space and octree for 3D space. One divides the 2D space into small squares and the other divides the 3d space into cubes. 
+
+While binary trees have 2 children on each node, Octree has 8 children cubes for a parent cube. The general idea to use Octree to accelerate the process of finding intersection between light rays and surfaces is check for bigger cubes first and then go down to its children cubes. 
+
+We can also make the OctTree sparse by checking for each node if its children cubes are all empty or contain the same object to save some space. 
+
+There also exists some other better solutions for space partitioning. For example, KD-Tree and BSP-Tree are some better solutions. We are not going to discuss them here.
+
+![SpacePartitioning](/images/SpacePartitioning.png)
+
+After having our tools to compute intersections, we can then finally look at how to do path tracing. 
+
+##Radiometry
 
 [Game101-Class]: https://sites.cs.ucsb.edu/~lingqi/teaching/games101.html
 [Game202-Class]: https://sites.cs.ucsb.edu/~lingqi/teaching/games202.html
@@ -42,3 +98,4 @@ In this form, we can solve for t by replacing any (x, y, z) with r(t) and get an
 [Game101-Class-16]: https://sites.cs.ucsb.edu/~lingqi/teaching/resources/GAMES101_Lecture_16.pdf
 [Volumetric RayTracing]: https://computergraphics.stackexchange.com/questions/227/how-are-volumetric-effects-handled-in-raytracing
 [equation-of-lines]: https://math.stackexchange.com/questions/404440/what-is-the-equation-for-a-3d-line
+[Moller]: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
